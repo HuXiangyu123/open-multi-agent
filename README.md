@@ -15,7 +15,7 @@ Build AI agent teams that decompose goals into tasks automatically. Define agent
 - **Auto Task Decomposition** — Describe a goal in plain text. A built-in coordinator agent breaks it into a task DAG with dependencies and assignees — no manual orchestration needed.
 - **Multi-Agent Teams** — Define agents with different roles, tools, and even different models. They collaborate through a message bus and shared memory.
 - **Task DAG Scheduling** — Tasks have dependencies. The framework resolves them topologically — dependent tasks wait, independent tasks run in parallel.
-- **Model Agnostic** — Claude, GPT, and local models (Ollama, vLLM, LM Studio) in the same team. Swap models per agent via `baseURL`.
+- **Model Agnostic** — Claude, GPT, Gemini, and local models (Ollama, vLLM, LM Studio) in the same team. Swap models per agent via `baseURL`.
 - **In-Process Execution** — No subprocess overhead. Everything runs in one Node.js process. Deploy to serverless, Docker, CI/CD.
 
 ## Quick Start
@@ -26,7 +26,12 @@ Requires Node.js >= 18.
 npm install @jackchen_me/open-multi-agent
 ```
 
-Set `ANTHROPIC_API_KEY` (and optionally `OPENAI_API_KEY` or `GITHUB_TOKEN` for Copilot) in your environment.
+Set the API key for your provider:
+
+- `ANTHROPIC_API_KEY`
+- `OPENAI_API_KEY`
+- `GEMINI_API_KEY`
+- `GITHUB_TOKEN` (for Copilot)
 
 Three agents, one goal — the framework handles the rest:
 
@@ -198,7 +203,7 @@ const result = await agent.run('Find the three most recent TypeScript releases.'
 </details>
 
 <details>
-<summary><b>Multi-Model Teams</b> — mix Claude, GPT, and local models in one workflow</summary>
+<summary><b>Multi-Model Teams</b> — mix Claude, GPT, Gemini, and local models in one workflow</summary>
 
 ```typescript
 const claudeAgent: AgentConfig = {
@@ -296,6 +301,7 @@ for await (const event of agent.stream('Explain monads in two sentences.')) {
 │  - stream()       │    │  - AnthropicAdapter  │
 └────────┬──────────┘    │  - OpenAIAdapter     │
          │               │  - CopilotAdapter    │
+         │               │  - GeminiAdapter     │
          │               └──────────────────────┘
 ┌────────▼──────────┐
 │  AgentRunner      │    ┌──────────────────────┐
@@ -319,7 +325,7 @@ for await (const event of agent.stream('Explain monads in two sentences.')) {
 
 Issues, feature requests, and PRs are welcome. Some areas where contributions would be especially valuable:
 
-- **LLM Adapters** — Anthropic, OpenAI, and Copilot are supported out of the box. Any OpenAI-compatible API (Ollama, vLLM, LM Studio, etc.) works via `baseURL`. Additional adapters for Gemini and other providers are welcome. The `LLMAdapter` interface requires just two methods: `chat()` and `stream()`.
+- **LLM Adapters** — Anthropic, OpenAI, and Copilot are supported out of the box. Any OpenAI-compatible API (Ollama, vLLM, LM Studio, etc.) works via `baseURL`. Additional adapters for other providers are welcome. The `LLMAdapter` interface requires just two methods: `chat()` and `stream()`.
 - **Examples** — Real-world workflows and use cases.
 - **Documentation** — Guides, tutorials, and API docs.
 
