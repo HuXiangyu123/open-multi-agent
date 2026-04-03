@@ -15,7 +15,7 @@ Build AI agent teams that decompose goals into tasks automatically. Define agent
 - **Auto Task Decomposition** — Describe a goal in plain text. A built-in coordinator agent breaks it into a task DAG with dependencies and assignees — no manual orchestration needed.
 - **Multi-Agent Teams** — Define agents with different roles, tools, and even different models. They collaborate through a message bus and shared memory.
 - **Task DAG Scheduling** — Tasks have dependencies. The framework resolves them topologically — dependent tasks wait, independent tasks run in parallel.
-- **Model Agnostic** — Claude, GPT, and local models (Ollama, vLLM, LM Studio) in the same team. Swap models per agent via `baseURL`.
+- **Model Agnostic** — Claude, GPT, Gemma 4, and local models (Ollama, vLLM, LM Studio) in the same team. Swap models per agent via `baseURL`.
 - **In-Process Execution** — No subprocess overhead. Everything runs in one Node.js process. Deploy to serverless, Docker, CI/CD.
 
 ## Quick Start
