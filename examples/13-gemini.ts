@@ -2,7 +2,7 @@
  * Quick smoke test for the Gemini adapter.
  *
  * Run:
- *   npx tsx examples/08-gemini-test.ts
+ *   npx tsx examples/13-gemini.ts
  *
  * If GEMINI_API_KEY is not set, the adapter will not work.
  */

@@ -11,6 +11,7 @@
  * API key resolution order:
  *   1. `apiKey` constructor argument
  *   2. `GEMINI_API_KEY` environment variable
+ *   3. `GOOGLE_API_KEY` environment variable
  *
  * @example
  * ```ts
@@ -37,7 +38,6 @@ import {
 
 import type {
   ContentBlock,
-  ImageBlock,
   LLMAdapter,
   LLMChatOptions,
   LLMMessage,
@@ -45,8 +45,6 @@ import type {
   LLMStreamOptions,
   LLMToolDef,
   StreamEvent,
-  TextBlock,
-  ToolResultBlock,
   ToolUseBlock,
 } from '../types.js'
 
@@ -255,7 +253,7 @@ export class GeminiAdapter implements LLMAdapter {
 
   constructor(apiKey?: string) {
     this.#client = new GoogleGenAI({
-      apiKey: apiKey ?? process.env['GEMINI_API_KEY'],
+      apiKey: apiKey ?? process.env['GEMINI_API_KEY'] ?? process.env['GOOGLE_API_KEY'],
     })
   }
 
@@ -377,20 +375,4 @@ export class GeminiAdapter implements LLMAdapter {
       yield { type: 'error', data: error } satisfies StreamEvent
     }
   }
-}
-
-// Re-export types that consumers of this module commonly need alongside the adapter.
-export type {
-  ContentBlock,
-  ImageBlock,
-  LLMAdapter,
-  LLMChatOptions,
-  LLMMessage,
-  LLMResponse,
-  LLMStreamOptions,
-  LLMToolDef,
-  StreamEvent,
-  TextBlock,
-  ToolResultBlock,
-  ToolUseBlock,
 }
