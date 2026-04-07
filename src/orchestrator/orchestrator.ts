@@ -64,6 +64,7 @@ import { TaskQueue } from '../task/queue.js'
 import { createTask } from '../task/task.js'
 import { Scheduler } from './scheduler.js'
 import { TokenBudgetExceededError } from '../errors.js'
+import { extractKeywords, keywordScore } from '../utils/keywords.js'
 
 // ---------------------------------------------------------------------------
 // Internal constants
@@ -94,9 +95,12 @@ const COMPLEXITY_PATTERNS: RegExp[] = [
   /\bstage\s*\d/i,
   /^\s*\d+[\.\)]/m,                       // numbered list items ("1. …", "2) …")
 
-  // Coordination language
-  /\bcollaborat/i,
-  /\bcoordinat/i,
+  // Coordination language — must be an imperative directive aimed at the agents
+  // ("collaborate with X", "coordinate the team", "agents should coordinate"),
+  // not a descriptive use ("how does X coordinate with Y" / "what does collaboration mean").
+  // Match either an explicit preposition or a noun-phrase that names a group.
+  /\bcollaborat(?:e|ing)\b\s+(?:with|on|to)\b/i,
+  /\bcoordinat(?:e|ing)\b\s+(?:with|on|across|between|the\s+(?:team|agents?|workers?|effort|work))\b/i,
   /\breview\s+each\s+other/i,
   /\bwork\s+together\b/i,
 
@@ -109,6 +113,7 @@ const COMPLEXITY_PATTERNS: RegExp[] = [
   // Matches patterns like "build X, then deploy Y and test Z"
   /\b(?:build|create|implement|design|write|develop)\b.{5,80}\b(?:and|then)\b.{5,80}\b(?:build|create|implement|design|write|develop|test|review|deploy)\b/i,
 ]
+
 
 /**
  * Maximum goal length (in characters) below which a goal *may* be simple.
@@ -126,6 +131,11 @@ const SIMPLE_GOAL_MAX_LENGTH = 200
  *   1. Its length is ≤ {@link SIMPLE_GOAL_MAX_LENGTH}.
  *   2. It does not match any {@link COMPLEXITY_PATTERNS}.
  *
+ * The complexity patterns are deliberately conservative — they only fire on
+ * imperative coordination directives (e.g. "collaborate with the team",
+ * "coordinate the workers"), so descriptive uses ("how do pods coordinate
+ * state", "explain microservice collaboration") remain classified as simple.
+ *
  * Exported for unit testing.
  */
 export function isSimpleGoal(goal: string): boolean {
@@ -136,12 +146,18 @@ export function isSimpleGoal(goal: string): boolean {
 /**
  * Select the best-matching agent for a goal using keyword affinity scoring.
  *
- * Scores each agent by keyword overlap between the goal text and the agent's
- * `name` + `systemPrompt`. Returns the highest-scoring agent, or falls back
- * to the first agent when all scores are equal.
+ * The scoring logic mirrors {@link Scheduler}'s `capability-match` strategy
+ * exactly, including its asymmetric use of the agent's `model` field:
  *
- * The keyword extraction and scoring logic mirrors the `capability-match`
- * strategy in {@link Scheduler} to keep behaviour consistent.
+ *  - `agentKeywords` is computed from `name + systemPrompt + model` so that
+ *    a goal which mentions a model name (e.g. "haiku") can boost an agent
+ *    bound to that model.
+ *  - `agentText` (used for the reverse direction) is computed from
+ *    `name + systemPrompt` only — model names should not bias the
+ *    text-vs-goal-keywords match.
+ *
+ * The two-direction sum (`scoreA + scoreB`) ensures both "agent describes
+ * goal" and "goal mentions agent capability" contribute to the final score.
  *
  * Exported for unit testing.
  */
@@ -155,9 +171,9 @@ export function selectBestAgent(goal: string, agents: AgentConfig[]): AgentConfi
 
   for (const agent of agents) {
     const agentText = `${agent.name} ${agent.systemPrompt ?? ''}`
-    const agentKeywords = extractKeywords(agentText)
+    // Mirror Scheduler.capability-match: include `model` here only.
+    const agentKeywords = extractKeywords(`${agent.name} ${agent.systemPrompt ?? ''} ${agent.model}`)
 
-    // Score in both directions (same as Scheduler.capability-match)
     const scoreA = keywordScore(agentText, goalKeywords)
     const scoreB = keywordScore(goal, agentKeywords)
     const score = scoreA + scoreB
@@ -169,25 +185,6 @@ export function selectBestAgent(goal: string, agents: AgentConfig[]): AgentConfi
   }
 
   return bestAgent
-}
-
-// ---- keyword helpers (shared with Scheduler via same logic) ----
-
-const STOP_WORDS = new Set([
-  'the', 'and', 'for', 'that', 'this', 'with', 'are', 'from', 'have',
-  'will', 'your', 'you', 'can', 'all', 'each', 'when', 'then', 'they',
-  'them', 'their', 'about', 'into', 'more', 'also', 'should', 'must',
-])
-
-function extractKeywords(text: string): string[] {
-  return [...new Set(
-    text.toLowerCase().split(/\W+/).filter((w) => w.length > 3 && !STOP_WORDS.has(w)),
-  )]
-}
-
-function keywordScore(text: string, keywords: string[]): number {
-  const lower = text.toLowerCase()
-  return keywords.reduce((acc, kw) => acc + (lower.includes(kw.toLowerCase()) ? 1 : 0), 0)
 }
 
 // ---------------------------------------------------------------------------
@@ -741,7 +738,11 @@ export class OpenMultiAgent {
    * @param config - Agent configuration.
    * @param prompt - The user prompt to send.
    */
-  async runAgent(config: AgentConfig, prompt: string): Promise<AgentRunResult> {
+  async runAgent(
+    config: AgentConfig,
+    prompt: string,
+    options?: { abortSignal?: AbortSignal },
+  ): Promise<AgentRunResult> {
     const effectiveBudget = resolveTokenBudget(config.maxTokenBudget, this.config.maxTokenBudget)
     const effective: AgentConfig = {
       ...config,
@@ -757,11 +758,22 @@ export class OpenMultiAgent {
       data: { prompt },
     })
 
-    const traceOptions: Partial<RunOptions> | undefined = this.config.onTrace
-      ? { onTrace: this.config.onTrace, runId: generateRunId(), traceAgent: config.name }
-      : undefined
+    // Build run-time options: trace + optional abort signal. RunOptions has
+    // readonly fields, so we assemble the literal in one shot.
+    const traceFields = this.config.onTrace
+      ? {
+          onTrace: this.config.onTrace,
+          runId: generateRunId(),
+          traceAgent: config.name,
+        }
+      : null
+    const abortFields = options?.abortSignal ? { abortSignal: options.abortSignal } : null
+    const runOptions: Partial<RunOptions> | undefined =
+      traceFields || abortFields
+        ? { ...(traceFields ?? {}), ...(abortFields ?? {}) }
+        : undefined
 
-    const result = await agent.run(prompt, traceOptions)
+    const result = await agent.run(prompt, runOptions)
 
     if (result.budgetExceeded) {
       this.config.onProgress?.({
@@ -835,7 +847,13 @@ export class OpenMultiAgent {
         data: { phase: 'short-circuit', goal },
       })
 
-      const result = await this.runAgent(bestAgent, goal)
+      // Forward the caller's abort signal so short-circuit honours the same
+      // cancellation contract as the full coordinator path.
+      const result = await this.runAgent(
+        bestAgent,
+        goal,
+        options?.abortSignal ? { abortSignal: options.abortSignal } : undefined,
+      )
       const agentResults = new Map<string, AgentRunResult>()
       agentResults.set(bestAgent.name, result)
 

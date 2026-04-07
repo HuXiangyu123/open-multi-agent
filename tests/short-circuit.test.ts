@@ -115,6 +115,43 @@ describe('isSimpleGoal', () => {
       expect(isSimpleGoal(goal)).toBe(false)
     })
   })
+
+  // -------------------------------------------------------------------------
+  // Regression: tightened coordinate/collaborate regex (PR #70 review point 5)
+  //
+  // Descriptive uses of "coordinate" / "collaborate" / "collaboration" must
+  // NOT be flagged as complex — only imperative directives aimed at agents.
+  // -------------------------------------------------------------------------
+
+  describe('tightened coordinate/collaborate patterns', () => {
+    it('descriptive "how X coordinates" is simple', () => {
+      expect(isSimpleGoal('Explain how Kubernetes pods coordinate state')).toBe(true)
+    })
+
+    it('descriptive "collaboration" noun is simple', () => {
+      expect(isSimpleGoal('What is microservice collaboration?')).toBe(true)
+    })
+
+    it('descriptive "team that coordinates" is simple', () => {
+      expect(isSimpleGoal('Describe a team that coordinates releases')).toBe(true)
+    })
+
+    it('descriptive "without collaborating" is simple', () => {
+      expect(isSimpleGoal('Show how to deploy without collaborating')).toBe(true)
+    })
+
+    it('imperative "collaborate with X" is complex', () => {
+      expect(isSimpleGoal('Collaborate with the writer to draft a post')).toBe(false)
+    })
+
+    it('imperative "coordinate the team" is complex', () => {
+      expect(isSimpleGoal('Coordinate the team for release')).toBe(false)
+    })
+
+    it('imperative "coordinate across services" is complex', () => {
+      expect(isSimpleGoal('Coordinate across services to roll out the change')).toBe(false)
+    })
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -157,6 +194,28 @@ describe('selectBestAgent', () => {
 
     // "review" should match "reviewer" agent name
     expect(selectBestAgent('Review this pull request', agents)).toBe(agents[1])
+  })
+
+  // -------------------------------------------------------------------------
+  // Regression: model field asymmetry (PR #70 review point 2)
+  //
+  // selectBestAgent must mirror Scheduler.capability-match exactly:
+  //   - agentKeywords includes `model`
+  //   - agentText excludes `model`
+  // This means a goal that mentions a model name should boost the agent
+  // bound to that model (via scoreB), even if neither name nor system prompt
+  // contains the keyword.
+  // -------------------------------------------------------------------------
+  it('matches scheduler asymmetry: model name in goal boosts the bound agent', () => {
+    const agents: AgentConfig[] = [
+      // Distinct, non-overlapping prompts so neither one wins on scoreA
+      { name: 'a1', model: 'haiku-fast-model', systemPrompt: 'You handle quick lookups' },
+      { name: 'a2', model: 'opus-deep-model', systemPrompt: 'You handle deep analysis' },
+    ]
+
+    // Mention "haiku" — this is only present in a1.model, so the bound
+    // agent should win because agentKeywords (which includes model) matches.
+    expect(selectBestAgent('Use the haiku model please', agents)).toBe(agents[0])
   })
 })
 
@@ -286,5 +345,88 @@ describe('runTeam short-circuit', () => {
     // Should pick 'coder' agent based on keyword match
     const startEvent = events.find(e => e.type === 'agent_start')
     expect(startEvent?.agent).toBe('coder')
+  })
+
+  // -------------------------------------------------------------------------
+  // Regression: abortSignal forwarding (PR #70 review point 4)
+  //
+  // The short-circuit path must forward `options.abortSignal` from runTeam
+  // through to runAgent, otherwise simple-goal cancellations are silently
+  // ignored — a regression vs the full coordinator path which already
+  // honours the signal via PR #69.
+  // -------------------------------------------------------------------------
+  it('forwards abortSignal from runTeam to runAgent in short-circuit path', async () => {
+    mockAdapterResponses = ['done']
+
+    const oma = new OpenMultiAgent({ defaultModel: 'mock-model' })
+    const team = oma.createTeam('t', teamCfg())
+
+    // Spy on runAgent to capture the options argument
+    const runAgentSpy = vi.spyOn(oma, 'runAgent')
+
+    const controller = new AbortController()
+    await oma.runTeam(team, 'Say hello', { abortSignal: controller.signal })
+
+    expect(runAgentSpy).toHaveBeenCalledTimes(1)
+    const callArgs = runAgentSpy.mock.calls[0]!
+    // Third positional arg must contain the same signal we passed in
+    expect(callArgs[2]).toBeDefined()
+    expect(callArgs[2]?.abortSignal).toBe(controller.signal)
+  })
+
+  it('runAgent invoked without abortSignal when caller omits it', async () => {
+    mockAdapterResponses = ['done']
+
+    const oma = new OpenMultiAgent({ defaultModel: 'mock-model' })
+    const team = oma.createTeam('t', teamCfg())
+
+    const runAgentSpy = vi.spyOn(oma, 'runAgent')
+
+    await oma.runTeam(team, 'Say hello')
+
+    expect(runAgentSpy).toHaveBeenCalledTimes(1)
+    const callArgs = runAgentSpy.mock.calls[0]!
+    // Third positional arg should be undefined when caller doesn't pass one
+    expect(callArgs[2]).toBeUndefined()
+  })
+
+  it('aborted signal causes the underlying agent loop to skip the LLM call', async () => {
+    // Pre-aborted controller — runner should break before any chat() call
+    const controller = new AbortController()
+    controller.abort()
+
+    mockAdapterResponses = ['should never be returned']
+
+    const oma = new OpenMultiAgent({ defaultModel: 'mock-model' })
+    const team = oma.createTeam('t', teamCfg())
+
+    const result = await oma.runTeam(team, 'Say hello', { abortSignal: controller.signal })
+
+    // Short-circuit ran one agent, but its loop bailed before any LLM call,
+    // so the agent's output is the empty string and token usage is zero.
+    const agentResult = result.agentResults.values().next().value
+    expect(agentResult?.output).toBe('')
+    expect(agentResult?.tokenUsage.input_tokens).toBe(0)
+    expect(agentResult?.tokenUsage.output_tokens).toBe(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Public API surface — internal helpers must stay out of the barrel export
+// (PR #70 review point 3)
+// ---------------------------------------------------------------------------
+
+describe('public API barrel', () => {
+  it('does not re-export isSimpleGoal or selectBestAgent', async () => {
+    const indexExports = await import('../src/index.js')
+    expect((indexExports as Record<string, unknown>).isSimpleGoal).toBeUndefined()
+    expect((indexExports as Record<string, unknown>).selectBestAgent).toBeUndefined()
+  })
+
+  it('still re-exports the documented public symbols', async () => {
+    const indexExports = await import('../src/index.js')
+    expect(indexExports.OpenMultiAgent).toBeDefined()
+    expect(indexExports.executeWithRetry).toBeDefined()
+    expect(indexExports.computeRetryDelay).toBeDefined()
   })
 })
