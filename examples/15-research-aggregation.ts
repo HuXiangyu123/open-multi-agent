@@ -1,5 +1,5 @@
 /**
- * Example 14 — Multi-Source Research Aggregation
+ * Example 15 — Multi-Source Research Aggregation
  *
  * Demonstrates runTasks() with explicit dependency chains:
  * - Parallel execution: three analyst agents research the same topic independently
@@ -14,7 +14,7 @@
  *   [technical-analyst, market-analyst, community-analyst] (parallel) → synthesizer
  *
  * Run:
- *   npx tsx examples/14-research-aggregation.ts
+ *   npx tsx examples/15-research-aggregation.ts
  *
  * Prerequisites:
  *   ANTHROPIC_API_KEY env var must be set.
