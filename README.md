@@ -4,7 +4,7 @@ The lightweight multi-agent orchestration engine for TypeScript. Three runtime d
 
 CrewAI is Python. LangGraph makes you draw the graph by hand. `open-multi-agent` is the `npm install` you drop into an existing Node.js backend when you need a team of agents to work on a goal together. Nothing more, nothing less.
 
-3 runtime dependencies · 35 source files · Deploys anywhere Node.js runs · Mentioned in [Latent Space](https://www.latent.space/p/ainews-a-quiet-april-fools) AI News (top AI engineering newsletter, 170k+ subscribers)
+3 runtime dependencies · 41 source files · Deploys anywhere Node.js runs
 
 [![GitHub stars](https://img.shields.io/github/stars/JackChen-me/open-multi-agent)](https://github.com/JackChen-me/open-multi-agent/stargazers)
 [![license](https://img.shields.io/github/license/JackChen-me/open-multi-agent)](./LICENSE)
@@ -19,7 +19,7 @@ CrewAI is Python. LangGraph makes you draw the graph by hand. `open-multi-agent`
 - **TypeScript-native, three runtime dependencies.** `@anthropic-ai/sdk`, `openai`, `zod`. That is the whole runtime. Embed in Express, Next.js, serverless functions, or CI/CD pipelines. No Python runtime, no subprocess bridge, no cloud sidecar.
 - **Multi-model teams.** Claude, GPT, Gemini, Grok, Copilot, or any OpenAI-compatible local model (Ollama, vLLM, LM Studio, llama.cpp) in the same team. Run the architect on Opus 4.6, the developer on GPT-5.4, the reviewer on local Gemma 4, all in one `runTeam()` call. Gemini ships as an optional peer dependency: `npm install @google/genai` to enable.
 
-Other features (structured output, task retry, human-in-the-loop, lifecycle hooks, loop detection, observability) live below the fold and in [`examples/`](./examples/).
+Other features (MCP integration, context strategies, structured output, task retry, human-in-the-loop, lifecycle hooks, loop detection, observability) live below the fold and in [`examples/`](./examples/).
 
 ## Philosophy: what we build, what we don't
 
@@ -36,7 +36,6 @@ Our goal is to be the simplest multi-agent framework for TypeScript. Simplicity 
 - **State persistence / checkpointing.** Not planned for now. Adding a storage backend would break the three-dependency promise, and our workflows run in seconds to minutes, not hours. If real usage shifts toward long-running workflows, we will revisit.
 
 **Tracking:**
-- **MCP support.** Next up, see [#86](https://github.com/JackChen-me/open-multi-agent/issues/86).
 - **A2A protocol.** Watching, will move when production adoption is real.
 
 See [`DECISIONS.md`](./DECISIONS.md) for the full rationale.
@@ -188,7 +187,7 @@ Run any with `npx tsx examples/02-team-collaboration.ts`.
 │  AgentRunner      │    ┌──────────────────────┐
 │  - conversation   │───►│  ToolRegistry        │
 │    loop           │    │  - defineTool()      │
-│  - tool dispatch  │    │  - 5 built-in tools  │
+│  - tool dispatch  │    │  - 6 built-in tools  │
 └───────────────────┘    └──────────────────────┘
 ```
 
@@ -201,6 +200,7 @@ Run any with `npx tsx examples/02-team-collaboration.ts`.
 | `file_write` | Write or create a file. Auto-creates parent directories. |
 | `file_edit` | Edit a file by replacing an exact string match. |
 | `grep` | Search file contents with regex. Uses ripgrep when available, falls back to Node.js. |
+| `glob` | Find files by glob pattern. Returns matching paths sorted by modification time. |
 
 ## Tool Configuration
 
