@@ -35,7 +35,7 @@ describe('DeepSeekAdapter', () => {
       expect(OpenAIMock).toHaveBeenCalledWith(
         expect.objectContaining({
           apiKey: 'deepseek-test-key-123',
-          baseURL: 'https://api.deepseek.com',
+          baseURL: 'https://api.deepseek.com/v1',
         })
       )
     } finally {
@@ -52,7 +52,7 @@ describe('DeepSeekAdapter', () => {
     expect(OpenAIMock).toHaveBeenCalledWith(
       expect.objectContaining({
         apiKey: 'some-key',
-        baseURL: 'https://api.deepseek.com',
+        baseURL: 'https://api.deepseek.com/v1',
       })
     )
   })
