@@ -4,12 +4,10 @@ The lightweight multi-agent orchestration engine for TypeScript. Three runtime d
 
 CrewAI is Python. LangGraph makes you draw the graph by hand. `open-multi-agent` is the `npm install` you drop into an existing Node.js backend when you need a team of agents to work on a goal together. Nothing more, nothing less.
 
-3 runtime dependencies · 41 source files · Deploys anywhere Node.js runs
-
 [![GitHub stars](https://img.shields.io/github/stars/JackChen-me/open-multi-agent)](https://github.com/JackChen-me/open-multi-agent/stargazers)
 [![license](https://img.shields.io/github/license/JackChen-me/open-multi-agent)](./LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue)](https://www.typescriptlang.org/)
-[![coverage](https://img.shields.io/badge/coverage-88%25-brightgreen)](https://github.com/JackChen-me/open-multi-agent/actions)
+[![coverage](https://img.shields.io/badge/coverage-85%25-brightgreen)](https://github.com/JackChen-me/open-multi-agent/actions)
 
 **English** | [中文](./README_zh.md)
 
@@ -65,20 +63,20 @@ Requires Node.js >= 18.
 npm install @jackchen_me/open-multi-agent
 ```
 
-Set the API key for your provider. Local models via Ollama require no API key — see [`providers/ollama`](examples/providers/ollama.ts).
+Set the API key for your provider. Local models via Ollama require no API key. See [`providers/ollama`](examples/providers/ollama.ts).
 
 - `ANTHROPIC_API_KEY`
 - `OPENAI_API_KEY`
 - `GEMINI_API_KEY`
 - `XAI_API_KEY` (for Grok)
 - `MINIMAX_API_KEY` (for MiniMax)
-- `MINIMAX_BASE_URL` (for MiniMax — optional, selects endpoint)
+- `MINIMAX_BASE_URL` (for MiniMax, optional, selects endpoint)
 - `DEEPSEEK_API_KEY` (for DeepSeek)
 - `GITHUB_TOKEN` (for Copilot)
 
 **CLI (`oma`).** For shell and CI, the package exposes a JSON-first binary. See [docs/cli.md](./docs/cli.md) for `oma run`, `oma task`, `oma provider`, exit codes, and file formats.
 
-Three agents, one goal — the framework handles the rest:
+Three agents, one goal. The framework handles the rest:
 
 ```typescript
 import { OpenMultiAgent } from '@jackchen_me/open-multi-agent'
@@ -105,7 +103,7 @@ const team = orchestrator.createTeam('api-team', {
   sharedMemory: true,
 })
 
-// Describe a goal — the framework breaks it into tasks and orchestrates execution
+// Describe a goal. The framework breaks it into tasks and orchestrates execution
 const result = await orchestrator.runTeam(team, 'Create a REST API for a todo list in /tmp/todo-api/')
 
 console.log(`Success: ${result.success}`)
@@ -133,7 +131,7 @@ Tokens: 12847 output tokens
 
 | Mode | Method | When to use |
 |------|--------|-------------|
-| Single agent | `runAgent()` | One agent, one prompt — simplest entry point |
+| Single agent | `runAgent()` | One agent, one prompt. Simplest entry point |
 | Auto-orchestrated team | `runTeam()` | Give a goal, framework plans and executes |
 | Explicit pipeline | `runTasks()` | You define the task graph and assignments |
 
@@ -141,16 +139,15 @@ For MapReduce-style fan-out without task dependencies, use `AgentPool.runParalle
 
 ## Examples
 
-[`examples/`](./examples/) is organized by category — basics, providers, patterns, integrations, and production. See [`examples/README.md`](./examples/README.md) for the full index. Highlights:
+[`examples/`](./examples/) is organized by category: basics, providers, patterns, integrations, and production. See [`examples/README.md`](./examples/README.md) for the full index. Highlights:
 
 - [`basics/team-collaboration`](examples/basics/team-collaboration.ts): `runTeam()` coordinator pattern.
-- [`providers/ollama`](examples/providers/ollama.ts): Ollama and Claude in one pipeline via `baseURL`.
 - [`patterns/structured-output`](examples/patterns/structured-output.ts): any agent returns Zod-validated JSON.
 - [`patterns/agent-handoff`](examples/patterns/agent-handoff.ts): synchronous sub-agent delegation via `delegate_to_agent`.
 - [`integrations/trace-observability`](examples/integrations/trace-observability.ts): `onTrace` spans for LLM calls, tools, and tasks.
 - [`integrations/mcp-github`](examples/integrations/mcp-github.ts): expose an MCP server's tools to an agent via `connectMCPTools()`.
-- [`providers/minimax`](examples/providers/minimax.ts), [`providers/deepseek`](examples/providers/deepseek.ts), [`providers/groq`](examples/providers/groq.ts): three-agent teams on each provider.
-- [`integrations/with-vercel-ai-sdk`](examples/integrations/with-vercel-ai-sdk/): Next.js app — OMA `runTeam()` + AI SDK `useChat` streaming.
+- [`integrations/with-vercel-ai-sdk`](examples/integrations/with-vercel-ai-sdk/): Next.js app combining OMA `runTeam()` with AI SDK `useChat` streaming.
+- **Provider examples**: eight three-agent teams (one per supported provider) under [`examples/providers/`](examples/providers/).
 
 Run scripts with `npx tsx examples/basics/team-collaboration.ts`.
 
@@ -284,7 +281,7 @@ const agent: AgentConfig = {
 
 Long tool outputs can blow up conversation size and cost. Two controls work together.
 
-**Truncation** — cap an individual tool result to a head + tail excerpt with a marker in between:
+**Truncation.** Cap an individual tool result to a head + tail excerpt with a marker in between:
 
 ```typescript
 const agent: AgentConfig = {
@@ -299,7 +296,7 @@ const bigQueryTool = defineTool({
 })
 ```
 
-**Post-consumption compression** — once the agent has acted on a tool result, compress older copies in the transcript so they stop costing input tokens on every subsequent turn. Error results are never compressed.
+**Post-consumption compression.** Once the agent has acted on a tool result, compress older copies in the transcript so they stop costing input tokens on every subsequent turn. Error results are never compressed.
 
 ```typescript
 const agent: AgentConfig = {
@@ -372,9 +369,9 @@ Pairs well with `compressToolResults` and `maxToolOutputChars` above.
 | DeepSeek | `provider: 'deepseek'` | `DEEPSEEK_API_KEY` | Verified |
 | GitHub Copilot | `provider: 'copilot'` | `GITHUB_TOKEN` | Verified |
 | Gemini | `provider: 'gemini'` | `GEMINI_API_KEY` | Verified |
-| Ollama / vLLM / LM Studio | `provider: 'openai'` + `baseURL` | — | Verified |
+| Ollama / vLLM / LM Studio | `provider: 'openai'` + `baseURL` | none | Verified |
 | Groq | `provider: 'openai'` + `baseURL` | `GROQ_API_KEY` | Verified |
-| llama.cpp server | `provider: 'openai'` + `baseURL` | — | Verified |
+| llama.cpp server | `provider: 'openai'` + `baseURL` | none | Verified |
 
 Gemini requires `npm install @google/genai` (optional peer dependency).
 
@@ -406,7 +403,7 @@ const localAgent: AgentConfig = {
 
 **Troubleshooting:**
 - Model not calling tools? Ensure it appears in Ollama's [Tools category](https://ollama.com/search?c=tools). Not all models support tool-calling.
-- Using Ollama? Update to the latest version (`ollama update`) — older versions have known tool-calling bugs.
+- Using Ollama? Update to the latest version (`ollama update`). Older versions have known tool-calling bugs.
 - Proxy interfering? Use `no_proxy=localhost` when running against local servers.
 
 ### LLM Configuration Examples
@@ -420,7 +417,7 @@ const grokAgent: AgentConfig = {
 }
 ```
 
-(Set your `XAI_API_KEY` environment variable — no `baseURL` needed.)
+(Set your `XAI_API_KEY` environment variable, no `baseURL` needed.)
 
 ```typescript
 const minimaxAgent: AgentConfig = {
@@ -453,8 +450,8 @@ Set `DEEPSEEK_API_KEY`. Available models: `deepseek-chat` (DeepSeek-V3, recommen
 
 Issues, feature requests, and PRs are welcome. Some areas where contributions would be especially valuable:
 
-- **Examples** — Real-world workflows and use cases.
-- **Documentation** — Guides, tutorials, and API docs.
+- **Production examples.** Real-world end-to-end workflows. See [`examples/production/README.md`](./examples/production/README.md) for the acceptance criteria and submission format.
+- **Documentation.** Guides, tutorials, and API docs.
 
 ## Contributors
 
@@ -474,7 +471,7 @@ Issues, feature requests, and PRs are welcome. Some areas where contributions wo
 
 ## Translations
 
-Help translate this README — [open a PR](https://github.com/JackChen-me/open-multi-agent/pulls).
+Help translate this README. [Open a PR](https://github.com/JackChen-me/open-multi-agent/pulls).
 
 ## License
 
