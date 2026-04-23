@@ -16,7 +16,7 @@
  *   - OPENAI_API_KEY
  *
  *   Optional:
- *   - LLM_PROVIDER=anthropic|openai-compatible
+ *   - LLM_PROVIDER=anthropic|openai
  *   - ANTHROPIC_BASE_URL for Anthropic-compatible relays
  *   - OPENAI_BASE_URL for OpenAI-compatible relays
  */
@@ -27,6 +27,8 @@ import type { AgentConfig, OrchestratorEvent, TokenUsage, TraceEvent } from '../
 // ---------------------------------------------------------------------------
 // Pricing
 // ---------------------------------------------------------------------------
+
+const PRICING_AS_OF = '2026-04-24'
 
 const PRICING = {
   // Anthropic + OpenAI API pricing, as of 2026-04-24, USD per 1M tokens
@@ -40,7 +42,7 @@ const PRICING = {
 
 type PricedModel = keyof typeof PRICING
 type UsageByModel = Partial<Record<PricedModel, TokenUsage>>
-type ProviderId = 'anthropic' | 'openai-compatible'
+type ProviderId = 'anthropic' | 'openai'
 type ProviderConfig = Pick<AgentConfig, 'provider' | 'model' | 'apiKey' | 'baseURL'>
 type AgentRunSummary = Map<string, { success: boolean, tokenUsage: TokenUsage }>
 type PipelineAssignments = {
@@ -162,7 +164,7 @@ function formatPercent(value: number): string {
 }
 
 function inferProvider(): ProviderId {
-  if (process.env.OPENAI_API_KEY) return 'openai-compatible'
+  if (process.env.OPENAI_API_KEY) return 'openai'
   if (process.env.ANTHROPIC_API_KEY) return 'anthropic'
 
   throw new Error('Set OPENAI_API_KEY or ANTHROPIC_API_KEY to run this example.')
@@ -172,12 +174,12 @@ function getSelectedProvider(): ProviderId {
   const requested = process.env.LLM_PROVIDER?.trim().toLowerCase()
   if (!requested) return inferProvider()
 
-  if (requested === 'anthropic' || requested === 'openai-compatible') {
+  if (requested === 'anthropic' || requested === 'openai') {
     return requested
   }
 
   throw new Error(
-    `Unsupported LLM_PROVIDER="${process.env.LLM_PROVIDER}". Use one of: anthropic, openai-compatible.`,
+    `Unsupported LLM_PROVIDER="${process.env.LLM_PROVIDER}". Use one of: anthropic, openai.`,
   )
 }
 
@@ -190,10 +192,10 @@ function getProviderConfigs(provider: ProviderId): {
   cheap: ProviderConfig
 } {
   switch (provider) {
-    case 'openai-compatible': {
+    case 'openai': {
       const apiKey = process.env.OPENAI_API_KEY
       if (!apiKey) {
-        throw new Error('LLM_PROVIDER=openai-compatible requires OPENAI_API_KEY.')
+        throw new Error('LLM_PROVIDER=openai requires OPENAI_API_KEY.')
       }
 
       const baseURL = process.env.OPENAI_BASE_URL
@@ -360,6 +362,21 @@ function printComparisonTable(runs: ScenarioResult[]): void {
   console.log()
 }
 
+function printFinalSummaryTable(runs: ScenarioResult[]): void {
+  console.log('Final Summary')
+  console.log('-'.repeat(60))
+  console.log('| Run | Models | Input | Output | USD cost | Wall time |')
+  console.log('|-----|--------|------:|-------:|---------:|----------:|')
+
+  for (const run of runs) {
+    console.log(
+      `| ${run.label} | ${describeAssignments(run.assignments)} | ${run.totalTokenUsage.input_tokens} | ${run.totalTokenUsage.output_tokens} | ${formatUsd(run.costUsd)} | ${formatSeconds(run.elapsedMs)} |`,
+    )
+  }
+
+  console.log()
+}
+
 function printScenarioDetails(run: ScenarioResult): void {
   console.log('='.repeat(60))
   console.log(run.label.toUpperCase())
@@ -507,6 +524,7 @@ console.log('Cost-Tiered Pipeline')
 console.log('='.repeat(60))
 console.log(`Provider: ${selectedProvider}`)
 console.log(`Endpoint: ${providerConfigs.endpointLabel}`)
+console.log(`Pricing as of: ${PRICING_AS_OF}`)
 console.log(`Topic: ${TOPIC}`)
 console.log('Pipeline: researcher -> classifier -> drafter -> reviewer')
 console.log()
@@ -528,6 +546,9 @@ console.log()
 
 printScenarioDetails(baselineRun)
 printScenarioDetails(tieredRun)
+
+console.log('='.repeat(60))
+printFinalSummaryTable([baselineRun, tieredRun])
 
 if (savings < 0.4) {
   console.error(`ASSERTION FAILED: tiered savings ${Math.round(savings * 100)}% < 40%`)
